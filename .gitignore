@@ -1,0 +1,10 @@
+others/
+sample_invoices*/
+
+tmp.py
+invoice_log.txt
+__pycache__/
+
+.venv/Lib/site-packages/pip
+.venv/Lib/site-packages/pip-24.3.1.dist-info
+

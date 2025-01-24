@@ -1,86 +1,161 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-class InvoiceSelectorApp:
-    def __init__(self, root, invoices):
+class InvoiceApp:
+    def __init__(self, root, invoices, surplus_items, missing_items):
         self.root = root
-        self.root.title("Invoice Selection")
-
-        # Store invoice data
+        self.root.title("Invoice Processing")
         self.invoices = invoices
-        self.selected_invoices = []
+        self.surplus_items = surplus_items
+        self.missing_items = missing_items
+        self.current_missing_index = 0
 
-        # Create frame for treeview and scrollbar
-        frame = ttk.Frame(root)
-        frame.pack(pady=10, padx=10, expand=True, fill="both")
+        self.show_selected_invoices()
 
-        # Create Treeview
-        self.tree = ttk.Treeview(frame, columns=("Select", "Invoice Number", "Order ID"), show="headings")
-        self.tree.heading("Select", text="✔")
-        self.tree.heading("Invoice Number", text="Invoice Number")
-        self.tree.heading("Order ID", text="Order ID")
-
-        # Create checkboxes
-        self.check_vars = []
-        for inv in invoices:
-            var = tk.BooleanVar()
-            self.check_vars.append(var)
-            self.tree.insert("", "end", values=("⬜", inv["invoiceNumber"], inv["orderId"]))
-
-        self.tree.bind("<ButtonRelease-1>", self.toggle_checkbox)  # Bind checkbox click event
-        self.tree.pack(side="left", fill="both", expand=True)
-
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscroll=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-
-        # Confirmation button
-        confirm_button = tk.Button(root, text="Confirm Selection", command=self.confirm_selection)
-        confirm_button.pack(pady=5)
-
-    def toggle_checkbox(self, event):
-        """Toggle checkbox state in Treeview"""
-        item = self.tree.identify_row(event.y)  # Identify clicked row
-        if not item:
-            return
-
-        index = self.tree.index(item)
-        if self.check_vars[index].get():
-            self.check_vars[index].set(False)
-            self.tree.item(item, values=("⬜", self.invoices[index]["invoiceNumber"], self.invoices[index]["orderId"]))
-        else:
-            self.check_vars[index].set(True)
-            self.tree.item(item, values=("✅", self.invoices[index]["invoiceNumber"], self.invoices[index]["orderId"]))
-
-    def confirm_selection(self):
-        """Retrieve selected invoices and ask for confirmation"""
-        self.selected_invoices = [
-            self.invoices[i]["invoiceNumber"]
-            for i, var in enumerate(self.check_vars) if var.get()
-        ]
-
-        if not self.selected_invoices:
-            messagebox.showwarning("No Selection", "Please select at least one invoice.")
-            return
-
-        confirm = messagebox.askyesno("Confirm", f"Proceed with updating these invoices?\n{self.selected_invoices}")
-        if confirm:
-            self.root.quit()  # Close GUI, proceed with updates
-
-def select_invoices_gui(invoices):
-    root = tk.Tk()
-    app = InvoiceSelectorApp(root, invoices)
-    root.mainloop()
-    return app.selected_invoices  # Return selected invoices
-
-if __name__ == "__main__":
+    def show_selected_invoices(self):
+        """Step 1: Show selected invoices."""
+        self.clear_window()
+        tk.Label(self.root, text="Invoice Name", font=("Arial", 12, "bold")).pack()
         
+        self.invoice_listbox = tk.Listbox(self.root, height=10, width=50)
+        for invoice in self.invoices:
+            self.invoice_listbox.insert(tk.END, invoice)
+        self.invoice_listbox.pack()
+        
+        next_button = tk.Button(self.root, text="Next", command=self.confirm_invoice_selection)
+        next_button.pack(pady=10)
 
-    # Example Usage
-    invoices = [
-        {"invoiceNumber": "INV-123", "orderId": "PO-1001"},
-        {"invoiceNumber": "INV-456", "orderId": "PO-1002"},
-    ]
-    selected = select_invoices_gui(invoices)
-    print("Selected Invoices:", selected)  # Proceed with processing
+    def confirm_invoice_selection(self):
+        """Step 2: Confirmation popup before proceeding."""
+        selected_invoices = self.invoices  # Show all listed invoices as selected
+        response = messagebox.askyesno("Confirm", f"Total {len(selected_invoices)} invoices found. Would you like to continue?")
+        if response:
+            self.show_surplus_missing_items()
+
+    def show_surplus_missing_items(self):
+        """Step 3: Show Surplus and Missing Items."""
+        self.clear_window()
+        
+        tk.Label(self.root, text="SURPLUS ITEMS", font=("Arial", 14, "bold")).pack()
+        self.surplus_tree = self.create_surplus_table().pack()
+        
+        tk.Label(self.root, text="MISSING ITEMS", font=("Arial", 14, "bold")).pack()
+        self.missing_tree = self.create_missing_table().pack()
+        
+        self.create_missing_input_fields()
+    
+    def create_table(self, data, columns, width):
+        """Create a generic table with given columns."""
+        tree = ttk.Treeview(self.root, columns=columns, show="headings")
+        for col, w in zip(columns, width):
+            tree.heading(col, text=col)
+            tree.column(col, width=w)
+        
+        for row in data:
+            tree.insert("", tk.END, values=row)
+        
+        return tree
+    
+    def cmt(self):
+        """Create a table for missing items without input fields."""
+        frame = ttk.Frame(self.root)
+        columns = ["Invoice No", "SUID", "UPC", "Shipped", "Received", "Receipt Alias", "Remark"]
+        self.missing_tree = ttk.Treeview(frame, columns=columns, show="headings")
+        for col in columns:
+            self.missing_tree.heading(col, text=col)
+            self.missing_tree.column(col, width=100)
+        
+        for row in self.missing_items:
+            self.missing_tree.insert("", tk.END, values=row)
+        
+        self.missing_tree.pack()
+        return frame
+    
+    def create_surplus_table(self):
+        columns = ["Invoice No", "SUID", "UPC", "Shipped", "Received", "Receipt Alias", "Remark"]
+        width = [100,100,100,100,100,100,100]
+        tree = self.create_table(self.surplus_items, columns, width)
+        return tree
+
+    def create_missing_table(self):
+        columns = ["Invoice No", "SUID", "UPC", "Shipped", "Received", "Receipt Alias", "Remark"]
+        width = [100,100,100,100,100,100,100]
+        tree = self.create_table(self.missing_items, columns, width)
+        return tree
+    
+    def create_missing_input_fields(self):
+        """Create input fields at the bottom for modifying missing items."""
+        frame = ttk.Frame(self.root)
+        frame.pack(pady=10)
+
+        self.current_missing = tk.StringVar(value="")
+        self.received_entry = tk.Entry(frame)
+        self.remark_var = tk.StringVar(value="none")
+        remark_dropdown = ttk.Combobox(frame, textvariable=self.remark_var, values=["none", "short", "other"], width=10)
+
+        tk.Label(frame, textvariable=self.current_missing, font=("Arial", 12, "bold")).pack()
+        self.received_entry.pack()
+        remark_dropdown.pack()
+
+        apply_button = tk.Button(frame, text="Apply", command=self.apply_missing_changes)
+        apply_button.pack()
+
+        self.load_next_missing()
+
+    def load_next_missing(self):
+        """Load the next missing item into the input fields."""
+        if self.current_missing_index < len(self.missing_items):
+            missing_item = self.missing_items[self.current_missing_index]
+            self.current_missing.set(f"Invoice: {missing_item[0]}, SUID: {missing_item[1]}, UPC: {missing_item[2]}")
+            self.received_entry.delete(0, tk.END)
+            self.received_entry.insert(0, missing_item[4])
+            self.remark_var.set("none")
+        else:
+            self.confirm_final_changes()
+    
+    def apply_missing_changes(self):
+        """Apply changes and load the next missing item."""
+        received_qty = self.received_entry.get()
+        remark = self.remark_var.get()
+        
+        if not received_qty.replace('.', '', 1).isdigit():
+            messagebox.showwarning("Invalid Input", "Received quantity must be a number.")
+            return
+        
+        self.missing_items[self.current_missing_index][4] = received_qty
+        self.missing_items[self.current_missing_index][6] = remark
+        self.current_missing_index += 1
+        self.load_next_missing()
+    
+    def confirm_final_changes(self):
+        """Step 4: Final confirmation before processing invoices."""
+        response = messagebox.askyesno("Confirm", "Do you confirm these changes? Once confirmed it will be reflected in the system.")
+        if response:
+            self.show_completion_message()
+    
+    def show_completion_message(self):
+        """Step 5: Show final instructions."""
+        self.clear_window()
+        tk.Label(self.root, text="Invoice confirmation process is done.", font=("Arial", 12)).pack()
+        tk.Label(self.root, text="You can push the result to the Catapult system by importing the resulted text files.").pack()
+        tk.Label(self.root, text="Afterwards, please confirm the following manually:").pack()
+        
+        items = ["worksheet alias", "receiver", "terms", "new items", "replaced items", "mispicks", "claims and credit memos", "numbers (fuel charge, bottle tax, and total)"]
+        for item in items:
+            tk.Label(self.root, text=f"- {item}").pack()
+        
+    def clear_window(self):
+        """Clear all widgets before showing new content."""
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+# Example Data
+invoices = ["UNFICHEESE - INV# 016163398003", "UNFIDAIRY - INV# 016163287003"]
+surplus_items = [["PO1", "11039", "081312400306", 5, 10, "Cheese 1kg",""],
+                 ["PO2", "12586", "810067101316", 2, 5, "Milk 2L",""]]
+missing_items = [["INV# 016163287003", "66642", "30871000021", 6, "", "Tofu 16oz",""],
+                 ["INV# 016163354003", "96964", "42272014286", 1, "", "Cereal 500g",""]]
+
+root = tk.Tk()
+app = InvoiceApp(root, invoices, surplus_items, missing_items)
+root.mainloop()
