@@ -224,12 +224,20 @@ if __name__ == "__main__":
     ## pop none from missing
     missing_items = [el for el in missing_items if el is not None]
     ## print
-    print("======SURPLUS ITEMS======")
-    for record in surplus_items.values():
-        print(record['details'])
-    print("======MISSING ITEMS======")
-    for invoiceID, _, detail in missing_items:
-        out = "{}, {}, {}, {}, {}, {}".format(
+    print(f"======SURPLUS ITEMS====== ({len(surplus_items)})")
+    print("Invoice No.  | SUID  |      UPC      | Shipped | Received | Receipt Alias ")
+    for record in sorted(surplus_items.values(), key=lambda x:x['details'][2]):
+        qty = record['surplus']
+        suID, upc, alias = record['details']
+        out = "{:>13}, {:>6}, {:>14}, {:>8}, {:>9}, {}".format(
+            '-', suID, upc, '-', qty, alias
+        )
+        print(out)
+
+    print(f"======MISSING ITEMS====== ({len(missing_items)})")
+    print("Invoice No.  | SUID  |      UPC      | Shipped | Received | Receipt Alias ")
+    for invoiceID, _, detail in sorted(missing_items, key=lambda x:x[2][RECORD_RECEIPTALIAS]):
+        out = "{:>13}, {:>6}, {:>14}, {:>8}, {:>9}, {}".format(
             invoiceID, 
             detail[RECORD_SUID], detail[RECORD_UPC], detail[RECORD_SHPQTY],
             detail[RECORD_RECQTY], detail[RECORD_RECEIPTALIAS]
@@ -238,10 +246,10 @@ if __name__ == "__main__":
 
     print()
     # things taht needs to be confirmed manually
-    while True:
-        ret = confirm_missing(invoices, missing_items)
-        if ret == True:
-            break
+    # while True:
+    #     ret = confirm_missing(invoices, missing_items)
+    #     if ret == True:
+    #         break
 
     save_invoices_to_txt(invoices)  
 
