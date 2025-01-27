@@ -1,10 +1,16 @@
 others/
-sample_invoices*/
+invoices*/
 
 tmp.py
 invoice_log.txt
+missing.txt
+surplus.txt
+
 __pycache__/
 
-.venv/Lib/site-packages/pip
-.venv/Lib/site-packages/pip-24.3.1.dist-info
+.venv/Lib/site-packages/*
+# pyinstaller
+.venv/Scripts/pyi*.exe
+InvoiceAuto.spec
+build/
 
