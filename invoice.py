@@ -41,6 +41,8 @@ class Invoice:
         return self.len
     
     def save_to_txt(self, filepath):
+        if all([rec is None for rec in self.records]):
+            return False
         with open(filepath, 'w') as f:
             f.write("Purchase Order\n[WorkSheetInfo]\n")
             f.write(','.join(self.worksheetInfo))
@@ -54,4 +56,5 @@ class Invoice:
                         else:
                             record_cp[idx] = f'{record_cp[idx]:.03f}'
                     f.write(','.join(record_cp))
+        return True
 

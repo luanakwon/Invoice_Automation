@@ -7,8 +7,8 @@ missing.txt
 surplus.txt
 
 __pycache__/
-
 .venv/Lib/site-packages/*
+
 # pyinstaller
 .venv/Scripts/pyi*.exe
 InvoiceAuto.spec

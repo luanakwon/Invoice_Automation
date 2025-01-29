@@ -42,14 +42,16 @@ def pop_invoice_discrepencies(invoices):
                         'details': (suID, upc, alias)}
                 )['surplus'] += receivedQty
                 # modify invoice
-                invoice.records[i] = None    
+                invoice.records[i][RECORD_RECQTY] = 0    
                 # log
-                logging.info(f"Found surplus item {suID}/{receivedQty}(not ordered)") 
+                logging.info(f"Found surplus item {suID}/{receivedQty}(not ordered) from {invoiceID}") 
             # ordered
             elif shippedQty >= 0:
                 # shipped == ordered
                 if shippedQty == receivedQty:
-                    invoice.records[i][RECORD_VFFLAG] = '1'
+                    # in this case, it should be verified, but I think importing disregards this info.
+                    # so the record is not modified, hence removed
+                    invoice.records[i] = None
                 # surplus item
                 elif receivedQty > shippedQty:
                     surplusQty = receivedQty - shippedQty
@@ -120,97 +122,23 @@ def fill_invoice_discrepencies(invoices, surplus_items, missing_items):
     missing_items = [el for el in missing_items if el is not None]
     return surplus_items, missing_items
 
-def confirm_missing(invoices, missing_items) -> bool:
-    # print
-    print('Please confirm the actual received quantity and any remarks')
-    logging.info('Please confirm the actual received quantity and any remarks')
-
-    confirmed = []
-    for invoiceID, idx, detail in missing_items:
-        invoiceID, remark, detail = confirm_each_missing(invoiceID, detail)
-        confirmed.append((
-            invoiceID, idx, detail, remark
-        ))
-    
-    # print
-    print("======summary======")
-    logging.info("======summary======")
-    for invoiceID, _, detail, remark in confirmed:
-        out = '{}, {}, {}, {}, {}, {}, {}'.format(
-            invoiceID, 
-            detail[RECORD_SUID], detail[RECORD_UPC], detail[RECORD_SHPQTY],
-            detail[RECORD_RECQTY], detail[RECORD_RECEIPTALIAS],
-            remark
-        )
-        print(out)
-        logging.info(out)
-
-    print("="*19)
-    logging.info("="*19)
-    ans = input("Do you confirm these changes?\nOnce confirmed, it will be reflected to the system(y/n): ").lower()
-    if ans == 'y':
-        for invoiceID, idx, detail, remark in confirmed:
-            invoices[invoiceID].records[idx][RECORD_RECQTY] = detail[RECORD_RECQTY]
-            invoices[invoiceID].records[idx][RECORD_VFFLAG] = '1'
-            if remark is not None:
-                remark_str = f'item {detail[RECORD_SUID]} - {remark}\n'
-                invoices[invoiceID].worksheetInfo[WORKSHEETINFO_REMARK] += remark_str
-        return True
-    else:
-        # TODO
-        # deal with it in the GUI
-        return False
-        
-
-
-
-
-def confirm_each_missing(invoiceID, detail):
-    # print info
-    out = "{}, {}, {}, {}, {}, {}".format(
-        invoiceID, 
-        detail[RECORD_SUID], detail[RECORD_UPC], detail[RECORD_SHPQTY],
-        detail[RECORD_RECQTY], detail[RECORD_RECEIPTALIAS]
-    )
-    print(out)
-    # confirm received quantity
-    while True:
-        try:
-            detail[RECORD_RECQTY] = float(input('Received Quantity: '))
-            assert(detail[RECORD_RECQTY] >= 0)
-            break
-        except ValueError:
-            print('Please enter a numeric value', end='\t')
-        except AssertionError:
-            print('Please enter a positive value', end='\t')
-
-    # confirm remark
-    while True:
-        remark = input('Remark (none/short/other): ').lower()
-        if remark == 'none':
-            remark = None
-            break
-        elif remark == 'short' or remark == 'other':
-            break
-        else:
-            print('Please choose from none/short/other', end='\t')
-
-    return invoiceID, remark, detail
-
 
 def save_invoices_to_txt(invoices, dir_path):
     for invoice in invoices.values():
         name = invoice.worksheetInfo[WORKSHEETINFO_NAME]
         fp = os.path.join(dir_path,f'DONE_{name}.txt')
-        invoice.save_to_txt(fp)
-        # log
-        logging.info(f"Saved invoice {name} to {fp}.")
+        is_saved = invoice.save_to_txt(fp)
+        if is_saved:
+            # log
+            logging.info(f"Saved invoice {name} to {fp}.")
+        else:
+            logging.info(f"Skipped invoice {name} (zero modified record).")
 
 def save_surplus_items_to_txt(surplus_items: dict, fp):
     with open(fp, 'w') as f:
         f.write(f"Surplus Items ({len(surplus_items)})\n")
         logging.info(f"Surplus Items ({len(surplus_items)})")
-        f.write(" Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias \n")
+        f.write(     " Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias \n")
         logging.info(" Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias ")
         for record in sorted(surplus_items.values(), key=lambda x:x['details'][0]):
             qty = record['surplus']
@@ -225,7 +153,7 @@ def save_missing_items_to_txt(missing_items: list, fp):
     with open(fp, 'w') as f:
         f.write(f"Missing Items ({len(missing_items)})\n")
         logging.info(f"Missing Items ({len(missing_items)})")
-        f.write(" Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias \n")
+        f.write(     " Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias \n")
         logging.info(" Invoice No.  |  SUID  |       UPC      | Shipped | Received | Receipt Alias ")
         for invoiceID, _, detail in sorted(missing_items, key=lambda x:x[0]+str(x[2][RECORD_SUID])):
             out = "{:>14}, {:>7}, {:>15}, {:>8}, {:>9}, {}".format(
@@ -257,21 +185,12 @@ if __name__ == "__main__":
 
     surplus_items, missing_items = fill_invoice_discrepencies(invoices, surplus_items, missing_items)
 
-    # show results
-    
+    # save missing, surplus results
     ## pop none from missing
     missing_items = [el for el in missing_items if el is not None]
-    ## return
     save_surplus_items_to_txt(surplus_items,'surplus.txt')
     save_missing_items_to_txt(missing_items, 'missing.txt')
-    
-    print()
-    # things taht needs to be confirmed manually
-    # while True:
-    #     ret = confirm_missing(invoices, missing_items)
-    #     if ret == True:
-    #         break
-
+    ## save resulting invoices
     save_dir_path = './invoices_out'
     if not os.path.exists(save_dir_path):
         os.mkdir(save_dir_path)
@@ -286,13 +205,14 @@ if __name__ == "__main__":
     # - terms
     # - Alias?
     # - Receiver?
-    
     print("Invoice confirmation process is done.")
     print("You can push the result to the Catapult system by importing the resulted text files.")
     print("Afterwards, please confirm the followings manually:")
     print("\tworksheet alias \n\treceiver \n\tterms")
     print("\tnew items \n\treplaced items \n\tmispicks \n\tclaims and creditmemos")
     print("\tnumbers(fuel charge, bottle tax and total)")
-
-
     input("Hit Enter to finish.")
+
+    # open results
+    os.startfile('surplus.txt')
+    os.startfile('missing.txt')
