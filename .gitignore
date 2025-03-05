@@ -7,10 +7,13 @@ missing.txt
 surplus.txt
 
 __pycache__/
-.venv/Lib/site-packages/*
+.venv/
 
 # pyinstaller
 .venv/Scripts/pyi*.exe
-InvoiceAuto.spec
+*.spec
 build/
+dist/
 
+# WebOffice Details
+catapult_elements.py
