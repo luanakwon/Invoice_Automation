@@ -1,7 +1,6 @@
 others/
 invoices*/
 
-tmp.py
 invoice_log.txt
 missing.txt
 surplus.txt
@@ -17,3 +16,7 @@ dist/
 
 # WebOffice Details
 catapult_elements.py
+
+# temporary files
+tmp.py
+tmp.html
