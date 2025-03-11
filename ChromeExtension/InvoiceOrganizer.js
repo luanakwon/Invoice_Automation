@@ -260,7 +260,7 @@ function FormatMissingToHTML(missingItems){
     return missing_html;
 }
 
-function Run(invoiceList){
+function OrganizeInvoices(invoiceList){
     let invoices = LoadInvoicesFromList(invoiceList);
     
     console.log('Invoices Processed: ')

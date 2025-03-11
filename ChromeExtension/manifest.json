@@ -24,7 +24,11 @@
     "content_scripts": [
         {
         "matches": ["https://*.catapultweboffice.com/*"],
-        "js": ["content.js"]
+        "js": [
+            "content.js",
+            "invoiceOrganizer.js",
+            "invoices.js"
+        ]
         }
     ]
 }

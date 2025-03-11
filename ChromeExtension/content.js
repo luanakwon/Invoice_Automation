@@ -1,3 +1,100 @@
+// send current url everytime content.js is loaded
+chrome.runtime.sendMessage({
+    action: "pageLoaded",
+    url: window.location.href
+})
+
+
+// message listener
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // listen to message "checkStartCondition"
+    if (message.action === "checkStartCondition") {
+        let urlPattern = CATAPULT_WORKSHEET_URL;
+        let elementPattern = CATAPULT_PO_URL_COMMON;
+
+        let urlCheck = checkURLStartsWith(urlPattern);
+        let elementCheck = checkElementHREfStartsWith(elementPattern);
+
+        chrome.runtime.sendMessage({
+            action: "startConditionResult",
+            success: urlCheck && elementCheck
+        });
+    }
+    // listen to "gatherSelectedInvoices"
+    else if (message.action === "gatherSelectedInvoices"){
+        // gather
+        let selectedInvoiceMap = gatherInvoiceSelection();
+        let selectedInvoiceList = Array.from(selectedInvoiceMap.keys());
+        window.sessionStorage.setItem("selectedInvoices",
+            JSON.stringify(selectedInvoiceList)
+        );
+        for (const name of selectedInvoiceList){
+            window.sessionStorage.setItem(name,
+                JSON.stringify(selectedInvoiceMap.get(name))
+            )
+        }
+        // send "selectedInvoicesResult"
+        chrome.runtime.sendMessage({
+            action: "selectedInvoicesResult",
+            selectedInvoices_size: selectedInvoices.size
+        });
+    }
+    // listen to "exportInvoices"
+    else if (message.action === "exportOneInvoice"){
+        if (message.url === window.location.href){
+            // export at this url
+            startExport();
+        }
+    }
+});
+
+async function startExport(){
+    // 2. wait for the export button to be ready
+    const exportReady = new Promise((resolve) => {
+        let checkExportButton = setInterval(() => {
+            let exportButton = document.querySelector(EXPORT_BTN);
+            if (exportButton && !exportButton.disabled) {
+                clearInterval(checkExportButton);
+                resolve();
+            }
+        }, 500);
+    });
+    await exportReady;
+
+    // 3. click export button
+    document.querySelector(EXPORT_BTN).click();
+
+    // 4. wait for the export format popup to be ready
+    const exportFormatPopUp = new Promise((resolve) => {
+        let checkExportFormat = setInterval(() => {
+            let exportFormat = document.querySelector(EXPORT_OK);
+            if (exportFormat) {
+                clearInterval(checkExportFormat);
+                resolve();
+            }
+        }, 500);
+    });
+    await exportFormatPopUp;
+
+    // 5. click ok button inside popup
+    document.querySelector(EXPORT_OK).click();    
+}
+
+
+// check if current URL is correct
+function checkURLStartsWith(pattern) {
+    return window.location.href.startsWith(pattern);
+}
+
+// check if the element's href attribute starts with the pattern
+function checkElementHREfStartsWith(pattern) {
+    let element = document.querySelector(`a[href^="${pattern}"] `);
+    if (element){
+        return true;
+    } else {
+        return false;
+    }
+}
 
 
 // set_download_dir => skip
@@ -80,7 +177,8 @@ async function gatherInvoiceSelection() {
                     name,
                     {
                         link: href,
-                        content: null
+                        exportedContent: null,
+                        importedContent: null
                     }
                 );
             }
@@ -102,7 +200,84 @@ async function gatherInvoiceSelection() {
     return selectedInvoices;
 }
 
-function confirmInvoiceSelection(selectedInvoices) {
+// async function exportInvoices(selectedInvoices) {
+//     let downloadCompletePromises = new Map();
+
+//     // add event listener that listens to the download event
+//     // and reads the file into selectedInvoices.get(name).content
+//     // and resolves matching promise
+//     chrome.downloads.onChanged.addListener((downloadDelta) => {
+//         if (!downloadDelta.state || downloadDelta.state.current !== "complete") return;
+    
+//         chrome.downloads.search({ id: downloadDelta.id }, (results) => {
+//             if (!results || results.length === 0) return;
+    
+//             let downloadedFile = results[0].filename; // Full file path
+//             console.log(`Downloaded: ${downloadedFile}`);
+//             let name = downloadedFile.split('/').at(-1).split('.')[0];
+
+//             // ✅ Read the downloaded file
+//             selectedInvoices.get(name).content = readDownloadedFile(downloadedFile);
+            
+//             // resolve the promise
+//             downloadCompletePromises.get(name).resolve();
+//         });
+//     });
+
+
+//     // call export on each invoice and wait for the content to be loaded
+//     for (const name of selectedInvoices.keys()) {
+//         let invoice = selectedInvoices.get(name);
+//         let href = invoice.link;
+
+//         // 1. open link
+//         window.open(href, '_blank');
+//         console.log(`Opened invoice for export: ${name}`);
+
+//         // 2. wait for the export button to be ready
+//         const exportReady = new Promise((resolve) => {
+//             let checkExportButton = setInterval(() => {
+//                 let exportButton = document.querySelector(EXPORT_BTN);
+//                 if (exportButton && !exportButton.disabled) {
+//                     clearInterval(checkExportButton);
+//                     resolve();
+//                 }
+//             }, 500);
+//         });
+//         await exportReady;
+
+//         // 3. click export button
+//         document.querySelector(EXPORT_BTN).click();
+    
+//         // 4. wait for the export format popup to be ready
+//         const exportFormatPopUp = new Promise((resolve) => {
+//             let checkExportFormat = setInterval(() => {
+//                 let exportFormat = document.querySelector(EXPORT_OK);
+//                 if (exportFormat) {
+//                     clearInterval(checkExportFormat);
+//                     resolve();
+//                 }
+//             }, 500);
+//         });
+//         await exportFormatPopUp;
+
+//         // 5. click ok button inside popup
+//         document.querySelector(EXPORT_OK).click();
+        
+//         // 6. wait for the download to complete
+//         const downloadComplete = new Promise((resolve) => {
+//             downloadCompletePromises.set(name, {resolve});
+//         });
+//         await downloadComplete;
+
+//         // continue to the next invoice
+//     }
+
+//     // return promise that resolves when all invoices are exported
+//     return new Promise(() => {});
+// }
+
+function confirmAndProcessInvoiceSelection(selectedInvoices) {
     if (confirm(
         `${selectedInvoices.size} invoices selected. Would you like to proceed?`
     )) {
@@ -110,11 +285,26 @@ function confirmInvoiceSelection(selectedInvoices) {
         // run invoiceOrganizer
         exportInvoices(selectedInvoices)
             .then(() => {
-                // process using InvoiceOrganizer
+                let [
+                    missing_html,
+                    surplus_html,
+                    invoicesOut_Name2Txt
+                ] = OrganizeInvoices(selectedInvoices)
+
+                let invoicesSel_Name2Href = new Map();
+                selectedInvoices.keys().forEach(name => {
+                    invoicesSel_Name2Href.set(name, selectedInvoices.get(name).link);
+                });
                 // ask if the user wants to update the system
                 // if yes, update the system
+                confirmAndImportResults(invoicesOut_Name2Txt, invoicesSel_Name2Href);
+                
+
                 // open missing and surplus in a new tab
+                window.open(`data:text/html,${missing_html}`, '_blank');
+                window.open(`data:text/html,${surplus_html}`, '_blank');
                 // download logs
+
                 // close chrome extension popup
             })
     } else {
@@ -122,82 +312,97 @@ function confirmInvoiceSelection(selectedInvoices) {
     }
 }
 
-
-
-
-
-async function exportInvoices(selectedInvoices) {
-    let downloadCompletePromises = new Map();
-
-    // add event listener that listens to the download event
-    // and reads the file into selectedInvoices.get(name).content
-    // and resolves matching promise
-    chrome.downloads.onChanged.addListener((downloadDelta) => {
-        if (!downloadDelta.state || downloadDelta.state.current !== "complete") return;
-    
-        chrome.downloads.search({ id: downloadDelta.id }, (results) => {
-            if (!results || results.length === 0) return;
-    
-            let downloadedFile = results[0].filename; // Full file path
-            console.log(`Downloaded: ${downloadedFile}`);
-            let name = downloadedFile.split('/').at(-1).split('.')[0];
-
-            // ✅ Read the downloaded file
-            selectedInvoices.get(name).content = readDownloadedFile(downloadedFile);
+async function confirmAndImportResults(invoicesOut_Name2Txt, invoicesSel_Name2Href) {
+    if (confirm(
+        'Would you also like to update your system?'
+    )) {
+        for (const [name, txt] of invoicesOut_Name2Txt) {
+            let href = invoicesSel_Name2Href.get(name).link;
             
-            // resolve the promise
-            downloadCompletePromises.get(name).resolve();
-        });
-    });
+            // open href
+            window.open(href, '_blank');
+            console.log(`Opened invoice for import: ${name}`);
 
+            // import via file input element
+            let fileInput = document.querySelector(`${IMPORT_FILEINPUT} input[type="file"]`);
+            let file = new Blob([txt], { type: 'text/plain' });
+            let dataTransfer = new DataTransfer();
+            dataTransfer.items.add(new File([file], `${name}.txt`));
+            fileInput.files = dataTransfer.files;
 
-    // call export on each invoice and wait for the content to be loaded
-    for (const name of selectedInvoices.keys()) {
-        let invoice = selectedInvoices.get(name);
-        let href = invoice.link;
+            // trigger change event to simulate user action
+            let event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
 
-        // 1. open link
-        window.open(href, '_blank');
-        console.log(`Opened invoice: ${name}`);
+            // handle import format popup
+            const importFormatPopUp = new Promise((resolve) => {
+                let checkImportFormat = setInterval(() => {
+                    let importFormat = document.querySelector(IMPORT_OK);
+                    if (importFormat) {
+                        clearInterval(checkImportFormat);
+                        resolve();
+                    }
+                }, 500);
+            });
+            await importFormatPopUp;
+            document.querySelector(IMPORT_OK).click();
 
-        // 2. wait for the export button to be ready
-        const exportReady = new Promise((resolve) => {
-            let checkExportButton = setInterval(() => {
-                let exportButton = document.querySelector('button#export');
-                if (exportButton && !exportButton.disabled) {
-                    clearInterval(checkExportButton);
-                    resolve();
-                }
-            }, 500);
-        });
-        await exportReady;
+            // handle "overwrite details?" popup
+            const overwriteDetailsPopUp = new Promise((resolve) => {
+                let checkOverwriteDetails = setInterval(() => {
+                    let overwriteDetails = document.querySelector(OVERWRITE_DETAILS);
+                    if (overwriteDetails) {
+                        clearInterval(checkOverwriteDetails);
+                        resolve();
+                    }
+                }, 500);
+            });
+            await overwriteDetailsPopUp;
+            document.querySelector(OVERWRITE_DETAILS_NO).click();
 
-        // 3. click export button
-    
-        // 4. wait for the export format popup to be ready
-        const exportFormatPopUp = new Promise((resolve) => {
-            let checkExportFormat = setInterval(() => {
-                let exportFormat = document.querySelector('select#exportFormat');
-                if (exportFormat) {
-                    clearInterval(checkExportFormat);
-                    resolve();
-                }
-            }, 500);
-        });
-        await exportFormatPopUp;
+            // handle "items not imported" popup
+            const itemsNotImportedPopUp = new Promise((resolve) => {
+                let checkItemsNotImported = setInterval(() => {
+                    let itemsNotImported = document.querySelector(ITEMS_NOT_IMPORTED);
+                    if (itemsNotImported) {
+                        clearInterval(checkItemsNotImported);
+                        resolve(true);
+                    }
+                }, 500);
+                setTimeout(() => {
+                    clearInterval(checkItemsNotImported);
+                    resolve(false);
+                }, 1100);
+            });
+            const itemsNotImportedAppeared = await itemsNotImportedPopUp;
+            if (itemsNotImportedAppeared) {
+                document.querySelector(ITEMS_NOT_IMPORTED_IGNORE).click();
+            }
 
-        // 5. click ok button inside popup
+            // save worksheet
+            let save_btn = document.querySelector(SAVE_BTN);
+            if (save_btn && !save_btn.disabled) {
+                save_btn.click();
+                // wait for the save to complete
+                const saveBtnDisabled = new Promise((resolve) => {
+                    let checkSaveBtn = setInterval(() => {
+                        let save_btn = document.querySelector(SAVE_BTN);
+                        if (save_btn.disabled) {
+                            clearInterval(checkSaveBtn);
+                            resolve();
+                        }
+                    }, 500);
+                });
+                await saveBtnDisabled;
 
-        
-        // 6. wait for the download to complete
-        let downloadComplete = new Promise((resolve) => {
-            downloadCompletePromises.set(name, {resolve});
-        });
-        await downloadComplete;
+                console.log(`Invoice imported: ${name}`);
+            }
 
-        // continue to the next invoice
+            // close this tab
+            // window.close();
+        }
+    } else {
+        alert("Import process dismissed");
     }
-
-    // return promise that resolves when all invoices are exported
-    return new Promise(() => {});
 }
+

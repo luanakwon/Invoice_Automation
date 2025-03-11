@@ -1,57 +1,83 @@
-document.getElementById("start").addEventListener("click", () => {
-    if (checkURLStartsWith("url-common") && checkElementHREfStartsWith("elementId", "href-common")) {
-        
-        // using chrome.scripting.executeScript 
-        chrome.scripting.executeScript({
-            target: { allFrames: true },
-            func: gatherInvoiceSelection
-        }, (gatherResults) => {
-            if (gatherResults && gatherResults[0].result.length === 0) {
-                alert("No invoices selected. Please select at least one invoice.");
-            } else {
-                let selectedInvoices = gatherResults[0].result;
-                chrome.scripting.executeScript({
-                    target: { allFrames: true },
-                    func: confirmInvoiceSelection,
-                    
-                    args: [selectedInvoices]
-                }, (confirmResults) => {
-                    if (confirmResults && confirmResults[0].result) {
-                        // read(or export) selected invoices
-                        // run invoiceOrganizer
-                        // ask if the user wants to update the system
-                        // if yes, update the system
-                        // open missing and surplus in a new tab
-                        // download logs
-                        // close chrome extension popup
-                
-                    } else {
-                        alert("Process cancelled.");
-                    }
-                });
-            }
-        });
+// popup.js is supposed to handel User Interactions
+var startButton = document.getElementById("start");
 
-        
-
-        // // not using chrome.scripting.executeScript
-        // let selectedInvoices = gatherInvoiceSelection();
-        // if (selectedInvoices.length === 0) {
-        //     alert("No invoices selected. Please select at least one invoice.");
-        //     return;
-        // } 
-        // let confirmed = confirmInvoiceSelection(selectedInvoices);
-        // if (!confirmed) {
-        //     alert("Process cancelled.");
-        //     return;
-        // }
-
-
-
+// get current state from background.js
+chrome.runtime.sendMessage({action:"requestCurrentState"}, (response)=>{
+    if (response && response.state > 0) {
+        startButton.disabled = false;
     } else {
-        alert("Please navigate to \"Purchase Order Worksheet\" to start the process.");
+        startButton.disabled = true;
     }
 });
+
+// click the button to start the process
+startButton.addEventListener("click", ()=>{
+    // disable button
+    startButton.disabled = true;
+    // send start to background.js
+    chrome.runtime.sendMessage({action:"start"});
+    
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'done') {
+        // all process finished.
+        alert("Process finished successfully.");
+        startButton.disabled = false;
+    }
+    else if  (message.action === 'popup_alert') {
+        alert(message.message);
+        if (message.state === 0) {startButton.disabled = false;}
+    }
+    else if (message.action === 'popup_confirm') {
+        sendResponse({confirmResult: confirm(message.message)});
+    }
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    
+})
+
+
+
+// document.getElementById("start").addEventListener("click", () => {
+//     if (checkURLStartsWith("url-common") && checkElementHREfStartsWith("elementId", "href-common")) {
+        
+//         // using chrome.scripting.executeScript 
+//         chrome.scripting.executeScript({
+//             target: { allFrames: true },
+//             func: gatherInvoiceSelection
+//         }, (gatherResults) => {
+//             if (gatherResults && gatherResults[0].result.length === 0) {
+//                 alert("No invoices selected. Please select at least one invoice.");
+//             } else {
+//                 let selectedInvoices = gatherResults[0].result;
+//                 chrome.scripting.executeScript({
+//                     target: { allFrames: true },
+//                     func: confirmAndProcessInvoiceSelection,
+//                     args: [selectedInvoices]
+//                 }, (confirmResults) => {
+//                     if (confirmResults && confirmResults[0].result) {
+//                         // read(or export) selected invoices
+//                         // run invoiceOrganizer
+//                         // ask if the user wants to update the system
+//                         // if yes, update the system
+//                         // open missing and surplus in a new tab
+//                         // download logs
+//                         // close chrome extension popup
+                
+//                     } else {
+//                         alert("Process cancelled.");
+//                     }
+//                 });
+//             }
+//         });
+
+
+//     } else {
+//         alert("Please navigate to \"Purchase Order Worksheet\" to start the process.");
+//     }
+// });
 
 function checkURLStartsWith(pattern) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
