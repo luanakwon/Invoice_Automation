@@ -7,7 +7,8 @@
         "activeTab",
         "storage",
         "scripting",
-        "downloads"
+        "downloads",
+        "tabs"
     ],
     "host_permissions": [
         "https://*.catapultweboffice.com/*"
@@ -24,11 +25,7 @@
     "content_scripts": [
         {
         "matches": ["https://*.catapultweboffice.com/*"],
-        "js": [
-            "content.js",
-            "invoiceOrganizer.js",
-            "invoices.js"
-        ]
+        "js": ["content.js"]
         }
     ]
 }

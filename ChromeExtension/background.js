@@ -10,6 +10,8 @@
 // 7 : finish
 var currentState = 0;
 
+importScripts("exporter.js", "importer.js", "invoiceOrganizer.js");
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // state request message from popup.js
     if (message.action === "requestCurrentState"){
@@ -65,7 +67,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         currentState = 4; // export
                         // start sequential export
                         // expected answer: exportSequenceResult   
-                        startExportSequence();
+                        Exporter.startExportSequence();
                     } else {
                         // selection denied
                         // to state idle w/o additional message
@@ -77,7 +79,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
                 });
         } else {
-            // zero invoices selected 2wq2
+            // zero invoices selected 
             currentState = 0;
             chrome.runtime.sendMessage({
                 action: "popup_alert",
@@ -107,7 +109,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentState = 5;
 
         // process(list of txt content) -> [missing_html, surplus_html, (sessionStorage)]
-        let [missing_html, surplus_html, name2txtContentMap] = OrganizeInvoices(txtContentList);
+        let [
+            missing_html, 
+            surplus_html, 
+            name2txtContentMap
+            ] = InvoiceOrganizer.organizeInvoices(txtContentList);
         // save returned content to session storage
         window.sessionStorage.setItem('missing_html', missing_html);
         window.sessionStorage.setItem('surplus_html', surplus_html);
@@ -135,7 +141,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     currentState = 6;
                     // start sequantial import                    
                     // expected answer: importSequenceResult  
-                    startImportSequence(); 
+                    Importer.startImportSequence(); 
                 } else {
                     // import dismissed
                     currentState = 7;
