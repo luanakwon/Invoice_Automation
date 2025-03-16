@@ -1,8 +1,8 @@
 
 function LoadInvoicesFromList(invoiceList) {
     let invoices = new Map();
-    invoiceList.forEach((invoice) => {
-        let invoice = new Invoice(invoice);
+    invoiceList.forEach((txtContent) => {
+        let invoice = new Invoice(txtContent);
         let invoiceID = invoice.worksheetInfo[WORKSHEETINFO_INVNO];
         invoices.set(invoiceID,invoice);
     });

@@ -1,8 +1,13 @@
-// state tracker
+// state tracking variable
+// visible to all scripts in background
 // 0 : idle
 // 1 : checkCondition
 // 2 : gather selection
-
+// 3 : confirm selection
+// 4 : export
+// 5 : organize
+// 6 : import
+// 7 : finish
 var currentState = 0;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -11,7 +16,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({state: currentState});
     }
     // start 
-    else if (message.action === "start" && currentState === 0) {
+    else if (currentState === 0 && message.action === "start") {
         // clear up the session storage
         window.sessionStorage.clear();
         // next state = 1 : checkCondition
@@ -24,7 +29,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     
     // listen to "startConditionResult"
-    if (message.action === "startConditionResult"){
+    if (currentState === 1 && message.action === "startConditionResult"){
         if (message.success){
             // next state = 2 : gatherSelection
             currentState = 2;
@@ -45,7 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     // listen to "selectedInvoicesResult"
-    else if (message.action === "selectedInvoicesResult"){
+    else if (currentState === 2 && message.action === "selectedInvoicesResult"){
         let n_selection = message.selectedInvoices_size;
         if (n_selection > 0){
             currentState = 3; // confirmSelection
@@ -59,61 +64,141 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     if (response.confirmResult){
                         currentState = 4; // export
                         // start sequential export
-                        // expected answer: exportInvoicesResult   
+                        // expected answer: exportSequenceResult   
                         startExportSequence();
                     } else {
                         // selection denied
-                        currentState = 0
+                        // to state idle w/o additional message
+                        currentState = 0;
                         chrome.runtime.sendMessage({
-                            action: "popup_alert",
-                            message: "Please select at least 1 invoice to continue",
+                            action: "popup_nomsg",
                             state: currentState
                         });
                     }
-                })
+                });
         } else {
-            alert("Please select at least 1 invoice to continue");
-            startButton.diabled = false;
+            // zero invoices selected 2wq2
+            currentState = 0;
+            chrome.runtime.sendMessage({
+                action: "popup_alert",
+                message: "Please select at least 1 invoice to continue",
+                state: currentState
+            });
         }
     }
-    // listen to "exportInvoicesResult"
-    // TODO
-    // process -> [missing_html, surplus_html, (sessionStorage)]
-    // next state = confirm import
-
-
-    // listen to "processInvoicesResult"
-    else if (message.action === "processInvoicesResult"){
-        let n_processed = message.processInvoices_size;
-        if (n_processed > 0) {
-            // confirm import
-            if (window.confirm('Would you also like to update your system?')){
-                // send message to import invoices
-                // expected answer: importInvoicesResult
-            } else {
-                // import dismissed
-                // send message to open missing + surplus
-
-                startButton.disabled = false;
+    // listen to "exportSequenceResult"
+    else if (currentState === 4 && message.action === "exportSequenceResult") {
+        // make generator = list of txt content
+        function* makeInvoiceContentList(namesList) {
+            let iterationCount = 0;
+            for (const invoiceName of namesList) {
+                iterationCount++;
+                yield new JSON.parse(
+                    window.sessionStorage.getItem(invoiceName)
+                );
             }
-        } else {
-            // Nothing changed. All invoices up to date.
-            alert("Nothing changed. All invoices up to date.");
-            startButton.disabled = false;
+            return iterationCount;
+        }
+        let exportedList = new Array(JSON.parse(
+            window.sessionStorage.getItem("selectedInvoices")
+        ));
+        let txtContentList = makeInvoiceContentList(exportedList);
+        // current state = 5: Organize
+        currentState = 5;
+
+        // process(list of txt content) -> [missing_html, surplus_html, (sessionStorage)]
+        let [missing_html, surplus_html, name2txtContentMap] = OrganizeInvoices(txtContentList);
+        // save returned content to session storage
+        window.sessionStorage.setItem('missing_html', missing_html);
+        window.sessionStorage.setItem('surplus_html', surplus_html);
+        window.sessionStorage.setItem('organizedInvoices',
+            JSON.stringify(Array.from(name2txtContentMap.keys()))
+        );
+        for (const name of name2txtContentMap.keys()){
+            let invoice = JSON.parse(
+                window.sessionStorage.getItem(name)
+            );
+            invoice.importedContent = name2txtContentMap.getItem(name);
+            window.sessionStorage.setItem(name,
+                JSON.stringify(invoice)
+            );
+        }
+        // next state = confirm import
+        chrome.runtime.sendMessage(
+            {
+                action: "popup_confirm",
+                message: 'Would you also like to update your system?',
+                state: currentState
+            }, (response) => {
+                if (response.confirmResult){
+                    // current state = 6: import
+                    currentState = 6;
+                    // start sequantial import                    
+                    // expected answer: importSequenceResult  
+                    startImportSequence(); 
+                } else {
+                    // import dismissed
+                    currentState = 7;
+                    saveAndOpenHtml("missing.html", missing_html);
+                    saveAndOpenHtml("surplus.html", surplus_html);
+
+                    // back to idle state
+                    currentState = 0;
+                    chrome.runtime.sendMessage({
+                        action: "popup_nomsg",
+                        state: currentState
+                    });
+                }
+            }
+        );
+    }
+    
+    // listen to importSequenceResult
+    else if (currentState === 6 && message.action === "importSequenceResult") {
+        if (success) {
+            currentState = 7; // finish
+            let missing_html = window.sessionStorage.getItem('missing_html');
+            let surplus_html = window.sessionStorage.getItem('surplus_html');
+            saveAndOpenHtml("missing.html", missing_html);
+            saveAndOpenHtml("surplus.html", surplus_html);
+
+            // back to idle state
+            currentState = 0;
+            chrome.runtime.sendMessage({
+                action: "popup_nomsg",
+                state: currentState
+            });
         }
     }
     
-    // listen to "importInvoicesResult"
-    else if (message.action === "importInvoicesResult"){
-        if (message.success) {
-            // send message to open missing + surplus
-
-            startButton.disabled = false;
-        } else {
-            // import fail? why?
-            console.log("import failed");
-            startButton.disabled = false;
-        }
+    // unhandled message
+    else {
+        console.log(`Unexpected Message(background.js/runtime/${currentState}): ${message}`);
     }
+});
 
-})
+// document.write() deprecated
+// function openMissingAndSurplus(missing_html, surplus_html){
+//     for (const _html of [missing_html, surplus_html]) {
+//         let newTab = window.open();
+//         newTab.document.open();
+//         newTab.document.write(htmlContent);
+//         newTab.document.close();
+//     }
+//     window.open(`data:text/html,${missing_html}`, '_blank');
+//     window.open(`data:text/html,${surplus_html}`, '_blank');
+// }
+
+function saveAndOpenHtml(htmlName, htmlContent) {
+    let blob = new Blob([htmlContent], { type: "text/html" });
+    let blobUrl = URL.createObjectURL(blob);
+
+    chrome.downloads.download({
+        url: blobUrl,
+        filename: htmlName,
+        saveAs: false
+    }, () => {
+        setTimeout(() => { window.open(blobUrl, "_blank"); }, 500);
+    });
+}
+

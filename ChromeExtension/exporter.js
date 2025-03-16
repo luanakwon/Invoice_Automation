@@ -1,7 +1,7 @@
-var selectedInvoiceList;
-var curIdx;
-var curName;
-var curInvoice;
+let selectedInvoiceList;
+let curIdx;
+let curName;
+let curInvoice;
 
 
 function startExportSequence() {
@@ -14,36 +14,39 @@ function startExportSequence() {
     // start from 0
     curIdx = 0;
     curName = selectedInvoiceList[curIdx];
-    curInvoice = new Map(
-        JSON.parse(
-            window.sessionStorage.getItem(curName)
-        )
+    curInvoice = JSON.parse(
+        window.sessionStorage.getItem(curName)
     );
     // start by navigating tab
     chrome.tabs.update({url: curInvoice.link});
 }
 
 function exportNext(){
+    curIdx++;
     // exit condition
     if (curIdx >= selectedInvoiceList.length) {
+        selectedInvoiceList = null;
+        curIdx = null;
+        curName = null;
+        curInvoice = null;
+
         chrome.runtime.sendMessage({
-            action: "exportInvoicesResult",
+            action: "exportSequenceResult",
             success: true
-        })
+        });
     }
     // export next
     else {
-        curIdx++;
         curName = selectedInvoiceList[curIdx];
-        curInvoice = new Map(JSON.parse(
+        curInvoice = JSON.parse(
             window.sessionStorage.getItem(curName)
-        ));
+        );
+        chrome.tabs.update({url: curInvoice.link});
     }
-    chrome.tabs.update({url: curInvoice.link});
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "pageLoaded") {
+    if (currentState === 4 && message.action === "pageLoaded") {
         if (curInvoice && curInvoice.link === message.url) {
             // expected page loaded
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -51,6 +54,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     { action: "exportOneInvoice", url: message.url}, ()=>{});
             });
         }
+    }
+    // unhandled message
+    else {
+        console.log(`Unexpected Message(exporter.js/runtime/${currentState}): ${message}`);
     }
 })
 
@@ -62,13 +69,13 @@ chrome.downloads.onChanged.addListener((downloadDelta) => {
     chrome.downloads.search({ id: downloadDelta.id }, (results) => {
         if (!results || results.length === 0) return;
 
-        const downloadedFile = results[0].filename; // Full file path
+        const downloadedFile = results[0].filename; 
         console.log(`Downloaded: ${downloadedFile}`);
-        const name = downloadedFile.split('/').at(-1).split('.')[0];
+        const name = downloadedFile.split('/').at(-1);
 
         // read the downloaded file only if 
         // exporter.curName === name
-        if (name === curName) {
+        if (name.startsWith(curName)) {
             readAndSaveDownLoadedFile(downloadedFile)
             .then(()=>{
                 exportNext();
