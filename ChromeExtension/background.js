@@ -19,28 +19,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     // start 
     else if (currentState === 0 && message.action === "start") {
+        console.log("message 'start' caught from background runtime");
         // clear up the session storage
-        window.sessionStorage.clear();
+        chrome.storage.session.clear();
         // next state = 1 : checkCondition
         currentState = 1;
         // start the sequence by checking conditions
         // expected answer: startConditionResult
-        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-            chrome.tabs.sendMessage(tabs[0].id, {action: "checkStartCondition"}, ()=>{});
-        })
+        console.log("sending message (background->tab[0]) checkstartcondition");
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {           
+            try {
+                chrome.tabs.sendMessage(tabs[0].id, {action: "checkStartCondition"}, ()=>{
+                    if (chrome.runtime.lastError) {
+                        if (chrome.runtime.lastError.message.startsWith("Could not establish connection")){
+                            console.log("no connection");
+                            currentState = 0;
+                            chrome.runtime.sendMessage({
+                                action: "popup_alert",
+                                message: "Please navigate to \"Purchase Order Worksheet\" to start the process.",
+                                state: currentState
+                            });
+                        }
+                    }
+                });
+            } catch ({name, message}) {
+                if (name === 'TypeError') {
+                    console.log("no accessible tab");
+                    currentState = 0;
+                    chrome.runtime.sendMessage({
+                        action: "popup_alert",
+                        message: "Please navigate to \"Purchase Order Worksheet\" to start the process.",
+                        state: currentState
+                    });
+                }
+            }
+        });
     }
     
     // listen to "startConditionResult"
-    if (currentState === 1 && message.action === "startConditionResult"){
+    else if (currentState === 1 && message.action === "startConditionResult"){
+        console.log("caught startCondition Result from background runtime listener");
         if (message.success){
-            // next state = 2 : gatherSelection
+            console.log("next state = 2 : gatherSelection");
             currentState = 2;
-            // send message to gather selection
+            console.log("send message to gather selection");
             // expected answer: selectedInvoiceResult
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 chrome.tabs.sendMessage(tabs[0].id, { action: "gatherSelectedInvoices" }, ()=>{});
             });
         } else {
+            console.log(message);
             // start condition faild. alert.
             currentState = 0;
             chrome.runtime.sendMessage({
@@ -53,7 +81,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // listen to "selectedInvoicesResult"
     else if (currentState === 2 && message.action === "selectedInvoicesResult"){
-        let n_selection = message.selectedInvoices_size;
+        console.log(message);
+        let selectedInvoiceMap = new Map(Object.entries(message.result));
+        let selectedInvoiceList = Array.from(selectedInvoiceMap.keys());
+        let n_selection = selectedInvoiceList.length;
+
         if (n_selection > 0){
             currentState = 3; // confirmSelection
             // confirm selection
@@ -64,10 +96,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     state: currentState
                 }, (response) => {
                     if (response.confirmResult){
-                        currentState = 4; // export
-                        // start sequential export
-                        // expected answer: exportSequenceResult   
-                        Exporter.startExportSequence();
+                        // save list
+                        console.log("saving selectedInvoiceList");
+                        console.log(selectedInvoiceList);
+                        console.log()
+                        chrome.storage.session.set(
+                            {selectedInvoices:JSON.stringify(selectedInvoiceList)}
+                        ).then(()=>{
+                            // save each item
+                            console.log("saving each item from selectedInvoiceMap");
+                            return Promise.all([
+                                selectedInvoiceList.map(name=>
+                                    chrome.storage.session.set(
+                                        Object.fromEntries(
+                                            [[name,JSON.stringify(selectedInvoiceMap.get(name))]]
+                                        )
+                                    )
+                                )
+                            ]);
+                        }).then(()=>{
+                            currentState = 4; // export
+                            // start sequential export
+                            // expected answer: exportSequenceResult   
+                            Exporter.startExportSequence();
+                        });
                     } else {
                         // selection denied
                         // to state idle w/o additional message
@@ -88,100 +140,123 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
         }
     }
-    // listen to "exportSequenceResult"
-    else if (currentState === 4 && message.action === "exportSequenceResult") {
-        // make generator = list of txt content
-        function* makeInvoiceContentList(namesList) {
-            let iterationCount = 0;
-            for (const invoiceName of namesList) {
-                iterationCount++;
-                yield new JSON.parse(
-                    window.sessionStorage.getItem(invoiceName)
-                );
-            }
-            return iterationCount;
-        }
-        let exportedList = new Array(JSON.parse(
-            window.sessionStorage.getItem("selectedInvoices")
-        ));
-        let txtContentList = makeInvoiceContentList(exportedList);
-        // current state = 5: Organize
-        currentState = 5;
-
-        // process(list of txt content) -> [missing_html, surplus_html, (sessionStorage)]
-        let [
-            missing_html, 
-            surplus_html, 
-            name2txtContentMap
-            ] = InvoiceOrganizer.organizeInvoices(txtContentList);
-        // save returned content to session storage
-        window.sessionStorage.setItem('missing_html', missing_html);
-        window.sessionStorage.setItem('surplus_html', surplus_html);
-        window.sessionStorage.setItem('organizedInvoices',
-            JSON.stringify(Array.from(name2txtContentMap.keys()))
-        );
-        for (const name of name2txtContentMap.keys()){
-            let invoice = JSON.parse(
-                window.sessionStorage.getItem(name)
-            );
-            invoice.importedContent = name2txtContentMap.getItem(name);
-            window.sessionStorage.setItem(name,
-                JSON.stringify(invoice)
-            );
-        }
-        // next state = confirm import
-        chrome.runtime.sendMessage(
-            {
-                action: "popup_confirm",
-                message: 'Would you also like to update your system?',
-                state: currentState
-            }, (response) => {
-                if (response.confirmResult){
-                    // current state = 6: import
-                    currentState = 6;
-                    // start sequantial import                    
-                    // expected answer: importSequenceResult  
-                    Importer.startImportSequence(); 
-                } else {
-                    // import dismissed
-                    currentState = 7;
-                    saveAndOpenHtml("missing.html", missing_html);
-                    saveAndOpenHtml("surplus.html", surplus_html);
-
-                    // back to idle state
-                    currentState = 0;
-                    chrome.runtime.sendMessage({
-                        action: "popup_nomsg",
-                        state: currentState
-                    });
-                }
-            }
-        );
-    }
-    
-    // listen to importSequenceResult
-    else if (currentState === 6 && message.action === "importSequenceResult") {
-        if (success) {
-            currentState = 7; // finish
-            let missing_html = window.sessionStorage.getItem('missing_html');
-            let surplus_html = window.sessionStorage.getItem('surplus_html');
-            saveAndOpenHtml("missing.html", missing_html);
-            saveAndOpenHtml("surplus.html", surplus_html);
-
-            // back to idle state
-            currentState = 0;
-            chrome.runtime.sendMessage({
-                action: "popup_nomsg",
-                state: currentState
-            });
-        }
-    }
     
     // unhandled message
     else {
-        console.log(`Unexpected Message(background.js/runtime/${currentState}): ${message}`);
+        console.log(`Unexpected Message(background.js/runtime/${currentState}): ${message.action}`);
     }
 });
+
+async function loadAndOrganizeExportedResult(){
+    if (currentState != 4) {
+        console.log("loadAndOrganizeExportedResult called in wrong state "+currentState);
+        return;
+    }
+    console.log("load the export result from chrome session");
+    let exportedList;
+    await chrome.storage.session.get("selectedInvoices").then((result)=>{
+        // exportedList = new Array(JSON.parse(result["selectedInvoices"]));
+        exportedList = JSON.parse(result["selectedInvoices"]);
+        console.log(exportedList);
+    });
+
+    let txtContentList = [];
+    for (const invoiceName of exportedList){
+        await chrome.storage.session.get(invoiceName).then((result)=>{
+            txtContentList.push(
+                JSON.parse(result[invoiceName]).exportedContent
+            );
+        });
+    }
+    // current state = 5: Organize
+    currentState = 5;
+    
+    let [
+        missing_html, 
+        surplus_html, 
+        name2txtContentMap
+        ] = InvoiceOrganizer.organizeInvoices(txtContentList);
+    // save returned content to session storage
+    await chrome.storage.session.set({missing_html});
+    await chrome.storage.session.set({surplus_html});
+    await chrome.storage.session.set(
+        {organizedInvoices:JSON.stringify(Array.from(name2txtContentMap.keys()))}
+    );
+
+    for (const name of name2txtContentMap.keys()){
+        let invoice;
+        await chrome.storage.session.get(name).then((result)=>{
+            invoice = JSON.parse(result[name]);
+        });
+        invoice.importedContent = name2txtContentMap.get(name);
+        await chrome.storage.session.set(
+            Object.fromEntries([[name, JSON.stringify(invoice)]]));
+    }
+    // next state = confirm import
+    console.log(`
+        TODO here. whenever something is clicked (chrome message, webpage, etc) popup.html would disappear, resulting lost connection. 
+        I'm not sure whether I should move such user confirmation to content.js,
+        or just use chrome.executeScript.`)
+
+    chrome.runtime.sendMessage(
+        {
+            action: "popup_confirm",
+            message: 'Would you also like to update your system?',
+            state: currentState
+        }, (response) => {
+            if (
+                !response ||
+                chrome.runtime.lastError.message.startsWith(
+                    "Could not establish connection")
+            ){
+                console.log("no connection");
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    chrome.scripting.executeScript({
+                        target: { tabId: tabs[0].id },
+                        func: () => confirm("Would you also like to update your system?")
+                    }).then(results => {
+                        const userConfirmed = results[0].result; // Fetch the returned value
+                        if (userConfirmed) {
+                            currentState = 6; // Set state to import
+                            Importer.startImportSequence();
+                        } else {
+                            openResultsAndFinishProcess();
+                        }
+                    });
+                });
+            }
+            else if (response.confirmResult){
+                // current state = 6: import
+                currentState = 6;
+                // start sequantial import                    
+                // expected answer: importSequenceResult  
+                Importer.startImportSequence(); 
+            } else {
+                // import dismissed
+                openResultsAndFinishProcess();
+            }
+        }
+    );
+    
+}
+
+function openResultsAndFinishProcess(){
+    currentState = 7; // finish
+            
+    chrome.storage.session.get(
+        ['missing_html','surplus_html']
+    ).then((result)=>{
+        saveAndOpenHtml("missing.html", result['missing_html']);
+        saveAndOpenHtml("surplus.html", result['surplus_html']);
+        
+        // back to idle state
+        currentState = 0;
+        chrome.runtime.sendMessage({
+            action: "popup_nomsg",
+            state: currentState
+        });
+    });     
+}
 
 // document.write() deprecated
 // function openMissingAndSurplus(missing_html, surplus_html){

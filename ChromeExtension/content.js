@@ -1,3 +1,9 @@
+
+
+// importScripts("catapultElements_test.js");
+
+console.log("content.js loaded");
+
 // send current url everytime content.js is loaded
 chrome.runtime.sendMessage({
     action: "pageLoaded",
@@ -14,6 +20,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         let urlCheck = checkURLStartsWith(urlPattern);
         let elementCheck = checkElementHREfStartsWith(elementPattern);
+        
+        console.log(`start condition result ${urlCheck}, ${elementCheck}`);
 
         chrome.runtime.sendMessage({
             action: "startConditionResult",
@@ -23,25 +31,65 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // listen to "gatherSelectedInvoices"
     else if (message.action === "gatherSelectedInvoices"){
         // gather
-        let selectedInvoiceMap = gatherInvoiceSelection();
-        let selectedInvoiceList = Array.from(selectedInvoiceMap.keys());
-        window.sessionStorage.setItem("selectedInvoices",
-            JSON.stringify(selectedInvoiceList)
-        );
-        for (const name of selectedInvoiceList){
-            window.sessionStorage.setItem(name,
-                JSON.stringify(selectedInvoiceMap.get(name))
-            )
-        }
-        // send "selectedInvoicesResult"
-        chrome.runtime.sendMessage({
-            action: "selectedInvoicesResult",
-            selectedInvoices_size: selectedInvoices.size
+        // let selectedInvoiceMap = gatherInvoiceSelection();
+        // let selectedInvoiceList = Array.from(selectedInvoiceMap.keys);
+        // let selectedInvoiceMap;
+        // let selectedInvoiceList;
+        gatherInvoiceSelection().then((result)=>{
+            console.log("gather selection then");
+            // selectedInvoiceMap = result;
+            // selectedInvoiceList = Array.from(selectedInvoiceMap.keys());
+
+            console.log("all gathered. sending result to background");
+            console.log(result.size);
+            console.log(result.keys());
+            console.log(Object.fromEntries(result));
+            chrome.runtime.sendMessage({
+                action: "selectedInvoicesResult",
+                result: Object.fromEntries(result)
+            });
+
         });
+        // }).then(
+        //     chrome.storage.session.set(
+        //         {selectedInvoices:JSON.stringify(selectedInvoiceList)}
+        // )).then(()=>{
+        //     return Promise.all([
+        //         selectedInvoiceList.map(name=>
+        //             chrome.storage.session.set(
+        //                 Object.fromEntries(
+        //                     [[name,JSON.stringify(selectedInvoiceMap.get(name))]]
+        //                 )
+        //             )
+        //         )
+        //     ]);
+        // }).then(()=>{
+        //     console.log("all gathered and saved to storage.session");
+        //     chrome.runtime.sendMessage({
+        //         action: "selectedInvoicesResult",
+        //         selectedInvoices_size: selectedInvoiceMap.size
+        //     });
+        // });
+
+        // window.sessionStorage.setItem("selectedInvoices",
+        //     JSON.stringify(selectedInvoiceList)
+        // );
+        // for (const name of selectedInvoiceList){
+        //     window.sessionStorage.setItem(name,
+        //         JSON.stringify(selectedInvoiceMap.get(name))
+        //     )
+        // }
+        // // send "selectedInvoicesResult"
+        // chrome.runtime.sendMessage({
+        //     action: "selectedInvoicesResult",
+        //     selectedInvoices_size: selectedInvoices.size
+        // });
     }
     // listen to "exportOneInvoice"
     else if (message.action === "exportOneInvoice"){
+        console.log("exportOneInvoice caught");
         if (message.url === window.location.href){
+            console.log(`url matches: ${message.url}\n${window.location.href}`);
             // export at this url
             exportFromCurrentPage();
             // following sequence expected to happen at
@@ -52,18 +100,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     else if (message.action === "importOneInvoice") {
         if (message.url === window.location.href){
             // import to this url
-            importToCurrentPage(message.name);
+            importToCurrentPage(
+                message.name,
+                JSON.parse(message.invoice)
+            );
         }
     }
     // unhandled message
     else {
-        console.log(`Unexpected Message(content.js/runtime/-): ${message}`);
+        console.log(`Unexpected Message(content.js/runtime/-): ${message.action}`);
     }
 });
 
 
 // check if current URL is correct
 function checkURLStartsWith(pattern) {
+    console.log(window.location.href);
+    console.log(pattern);
     return window.location.href.startsWith(pattern);
 }
 
@@ -84,10 +137,10 @@ async function gatherInvoiceSelection() {
         first_button.scrollIntoView();
         first_button.click();
         console.log("Navigating to the first page of Purchase Orders table.");
+
+        // wait for the table to load
+        await new Promise(r => setTimeout(r, 500));
     }
-    
-    // wait for the table to load
-    await new Promise(r => setTimeout(r, 500));
 
     let selectedInvoices = new Map();
     let page = 1;
@@ -104,7 +157,8 @@ async function gatherInvoiceSelection() {
             let checkbox = checkboxes.snapshotItem(i);
             if (checkbox.checked) {
                 let row = checkbox;
-                while (row && row.tagName !== 'tr') {
+                while (row && row.tagName !== 'TR') {
+                    console.log(row);
                     row = row.parentElement;
                 }
 
@@ -142,7 +196,7 @@ async function exportFromCurrentPage(){
     // 2. wait for the export button to be ready
     const exportReady = new Promise((resolve) => {
         let checkExportButton = setInterval(() => {
-            let exportButton = document.querySelector(EXPORT_BTN);
+            let exportButton = EXPORT_BTN.getElement();
             if (exportButton && !exportButton.disabled) {
                 clearInterval(checkExportButton);
                 resolve();
@@ -152,13 +206,15 @@ async function exportFromCurrentPage(){
     await exportReady;
 
     // 3. click export button
-    document.querySelector(EXPORT_BTN).click();
+    EXPORT_BTN.getElement().click();
 
     // 4. wait for the export format popup to be ready
     const exportFormatPopUp = new Promise((resolve) => {
+        console.log("export format poped up");
         let checkExportFormat = setInterval(() => {
-            let exportFormat = document.querySelector(EXPORT_OK);
+            let exportFormat = EXPORT_OK.getElement();
             if (exportFormat) {
+                console.log('export button found');
                 clearInterval(checkExportFormat);
                 resolve();
             }
@@ -167,13 +223,14 @@ async function exportFromCurrentPage(){
     await exportFormatPopUp;
 
     // 5. click ok button inside popup
-    document.querySelector(EXPORT_OK).click();    
+    EXPORT_OK.getElement().click();    
 }
 
-async function importToCurrentPage(name){
-    let invoice = JSON.parse(
-        window.sessionStorage.getItem(name)
-    );
+async function importToCurrentPage(name, invoice){
+    // let invoice;
+    // await chrome.storage.session.get(name).then((result)=>{
+    //     invoice = JSON.parse(result[name]);
+    // });
     // import via file input element
     let fileInput = document.querySelector(`${IMPORT_FILEINPUT} input[type="file"]`);
     let file = new Blob([invoice.importedContent], { type: 'text/plain' });
@@ -188,7 +245,7 @@ async function importToCurrentPage(name){
     // handle import format popup
     const importFormatPopUp = new Promise((resolve) => {
         let checkImportFormat = setInterval(() => {
-            let importFormat = document.querySelector(IMPORT_OK);
+            let importFormat = IMPORT_OK.getElement();
             if (importFormat) {
                 clearInterval(checkImportFormat);
                 resolve();
@@ -196,7 +253,7 @@ async function importToCurrentPage(name){
         }, 500);
     });
     await importFormatPopUp.then(()=>{
-        document.querySelector(IMPORT_OK).click();
+        IMPORT_OK.getElement().click();
     });
 
     // handle "overwrite details?" popup
@@ -210,7 +267,7 @@ async function importToCurrentPage(name){
         }, 500);
     });
     await overwriteDetailsPopUp.then(()=>{
-        document.querySelector(OVERWRITE_DETAILS_NO).click();
+        OVERWRITE_DETAILS_NO.getElement().click();
     });
     
     // handle "items not imported" popup
@@ -228,20 +285,20 @@ async function importToCurrentPage(name){
         }, 1100);
     });
     await itemsNotImportedPopUp.then(()=>{
-        document.querySelector(ITEMS_NOT_IMPORTED_IGNORE).click();
+        ITEMS_NOT_IMPORTED_IGNORE.getElement().click();
         console.log('not imported items dismissed');
     }).catch(()=>{
         console.log('every item imported');
     });
 
     // save worksheet
-    let save_btn = document.querySelector(SAVE_BTN);
+    let save_btn = SAVE_BTN.getElement();
     if (save_btn && !save_btn.disabled) {
         save_btn.click();
         // wait for the save to complete
         const saveBtnDisabled = new Promise((resolve) => {
             let checkSaveBtn = setInterval(() => {
-                let save_btn = document.querySelector(SAVE_BTN);
+                let save_btn = SAVE_BTN.getElement();
                 if (save_btn.disabled) {
                     clearInterval(checkSaveBtn);
                     resolve();

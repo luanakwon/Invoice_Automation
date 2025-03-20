@@ -22,7 +22,7 @@ class Invoice {
                 this.worksheetInfo = line.split(',');
             } else if (index >= 4) {
                 var record = line.split(',');
-                for (idx in [RECORD_RECQTY, RECORD_SHPQTY]) {
+                for (const idx of [RECORD_RECQTY, RECORD_SHPQTY]) {
                     if (record[idx] === ''){
                         record[idx] = -1;
                     } else {
@@ -33,7 +33,7 @@ class Invoice {
             }
         });
 
-        this.len = self.records.length;
+        this.len = this.records.length;
     }
 
     // override .length
@@ -49,7 +49,7 @@ class Invoice {
                 // copy record to prevent changing the original record
                 let record_cp = record.slice();
                 // replace -1 with ''
-                for (idx in [RECORD_RECQTY, RECORD_SHPQTY]) {
+                for (const idx of [RECORD_RECQTY, RECORD_SHPQTY]) {
                     if (record_cp[idx] === -1) {
                         record_cp[idx] = '';
                     } 

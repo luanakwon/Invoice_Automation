@@ -16,7 +16,9 @@ dist/
 
 # WebOffice Details
 catapult_elements.py
+ChromeExtension/catapultElements.js
 
 # temporary files
 tmp.py
 tmp.html
+temporary/

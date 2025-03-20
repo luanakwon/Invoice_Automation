@@ -5,21 +5,29 @@ const Importer = (()=>{
     let curName;
     let curInvoice;
 
-    function startImportSequence() {
+    async function startImportSequence() {
         // add listener
         chrome.runtime.onMessage.addListener(runtimeMessageListener);
         // load list from session storage
-        organizedInvoiceList = new Array(
-            JSON.parse(
-                window.sessionStorage.getItem("organizedInvoice")
+        await chrome.storage.session.get("organizedInvoices").then((result)=>{
+            organizedInvoiceList = new Array(
+                JSON.parse(result["organizedInvoices"])
             )
-        );
+        });
+        // organizedInvoiceList = new Array(
+        //     JSON.parse(
+        //         window.sessionStorage.getItem("organizedInvoice")
+        //     )
+        // );
         // start from 0
         curIdx = 0;
         curName = organizedInvoiceList[curIdx];
-        curInvoice = JSON.parse(
-            window.sessionStorage.getItem(curName)
-        );
+        await chrome.storage.session.get(curName).then((result)=>{
+            curInvoice = JSON.parse(result[curName]);
+        });
+        // curInvoice = JSON.parse(
+        //     window.sessionStorage.getItem(curName)
+        // );
         // start by navigating tab
         chrome.tabs.update({url: curInvoice.link});
     }
@@ -35,18 +43,19 @@ const Importer = (()=>{
 
             chrome.runtime.onMessage.removeListener(runtimeMessageListener);
 
-            chrome.runtime.sendMessage({
-                action: "importSequenceResult",
-                success: true
-            });
+            openResultsAndFinishProcess();
         }
-        // export next
+        // import next
         else {
             curName = organizedInvoiceList[curIdx];
-            curInvoice = JSON.parse(
-                window.sessionStorage.getItem(curName)
-            );
-            chrome.tabs.update({url: curInvoice.link});
+            chrome.storage.session.get(curName).then((result)=>{
+                curInvoice = JSON.parse(result[curName]);
+                chrome.tabs.update({url: curInvoice.link});
+            });
+            // curInvoice = JSON.parse(
+            //     window.sessionStorage.getItem(curName)
+            // );
+            // chrome.tabs.update({url: curInvoice.link});
         }
     }
 
@@ -56,7 +65,12 @@ const Importer = (()=>{
                 // expected page loaded
                 chrome.tabs.query({active: true, currentWindow: true}, (tabs) =>{
                     chrome.tabs.sendMessage(tabs[0].id,
-                        { action: "importOneInvoice", url: message.url, name:curName}, 
+                        { 
+                            action: "importOneInvoice", 
+                            url: message.url,
+                            name: curName,
+                            invoice: JSON.stringify(curInvoice)
+                        }, 
                         ()=>{});
                 });
             }
@@ -69,7 +83,7 @@ const Importer = (()=>{
         }
         // unhandled message
         else {
-            console.log(`Unexpected Message(importer.js/runtime/${currentState}): ${message}`);
+            console.log(`Unexpected Message(importer.js/runtime/${currentState}): ${message.action}`);
         }
     }
 
