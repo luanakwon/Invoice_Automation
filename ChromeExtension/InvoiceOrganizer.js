@@ -8,17 +8,21 @@ const InvoiceOrganizer = (()=>{
             let invoice = new Invoice(txtContent);
             let invoiceID = invoice.worksheetInfo[WORKSHEETINFO_INVNO];
             invoices.set(invoiceID,invoice);
+            console.log(invoiceID);
+            console.log(invoice);
         });
         return invoices;
     }
 
     function PopInvoiceDiscrepencies(invoices) {
+        console.log(`popupinvoicediscrepencies`);
+        console.log(invoices);
         let surplusItems = new Map();
         let missingItems = [];
 
         // for each invoice value in the invoices key-value pairs
-        for (let invoiceID in invoices) {
-            let invoice = invoices[invoiceID];
+        for (const invoiceID of invoices.keys()) {
+            let invoice = invoices.get(invoiceID);
             for (let i=0; i<invoice.length; i++) {
                 let item = invoice.records[i];
                 let suID = item[RECORD_SUID];
@@ -51,6 +55,7 @@ const InvoiceOrganizer = (()=>{
                         // in this case, it should be verified, but I think importing disregards this info.
                         // so the record is not modified, hence removed
                         invoice.records[i] = null;
+                        console.log('###received === shipped');
                     }
                     // received > shipped
                     else if (receivedQty > shippedQty){
@@ -110,7 +115,7 @@ const InvoiceOrganizer = (()=>{
                         surplusItems.delete(suID);
                     }
                     missingItems[i] = null;
-                    invoices[invoiceID].records[idx][RECORD_RECQTY] = shippedQty;
+                    invoices.get(invoiceID).records[idx][RECORD_RECQTY] = shippedQty;
                     // log
                     console.log(`Fully Filled missing item ${suID}/${missingQty} at ${invoiceID} using surplus`);
                 } else {
@@ -118,10 +123,12 @@ const InvoiceOrganizer = (()=>{
                     let newQty = receivedQty + surplusQty;
                     surplusItems.delete(suID);
                     missingItems[i][2][RECORD_RECQTY] = newQty;
-                    invoices[invoiceID].records[idx][RECORD_RECQTY] = newQty;
+                    invoices.get(invoiceID).records[idx][RECORD_RECQTY] = newQty;
                     // log
                     console.log(`Partially Filled missing item ${suID}/${missingQty} at ${invoiceID} using surplus`);
                 }
+            } else {
+                console.log(`### could not find ${suID} from surplus items`);
             }
         }
         missingItems = missingItems.filter((item) => item !== null);
@@ -264,6 +271,7 @@ const InvoiceOrganizer = (()=>{
     }
 
     function organizeInvoices(invoiceList){
+        console.log(invoiceList);
         let invoices = LoadInvoicesFromList(invoiceList);
         
         console.log('Invoices Processed: ')

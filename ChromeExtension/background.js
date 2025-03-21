@@ -196,7 +196,7 @@ async function loadAndOrganizeExportedResult(){
     console.log(`
         TODO here. whenever something is clicked (chrome message, webpage, etc) popup.html would disappear, resulting lost connection. 
         I'm not sure whether I should move such user confirmation to content.js,
-        or just use chrome.executeScript.`)
+        or just use chrome.executeScript.`);
 
     chrome.runtime.sendMessage(
         {
@@ -243,43 +243,13 @@ async function loadAndOrganizeExportedResult(){
 function openResultsAndFinishProcess(){
     currentState = 7; // finish
             
-    chrome.storage.session.get(
-        ['missing_html','surplus_html']
-    ).then((result)=>{
-        saveAndOpenHtml("missing.html", result['missing_html']);
-        saveAndOpenHtml("surplus.html", result['surplus_html']);
-        
-        // back to idle state
-        currentState = 0;
-        chrome.runtime.sendMessage({
-            action: "popup_nomsg",
-            state: currentState
-        });
-    });     
-}
-
-// document.write() deprecated
-// function openMissingAndSurplus(missing_html, surplus_html){
-//     for (const _html of [missing_html, surplus_html]) {
-//         let newTab = window.open();
-//         newTab.document.open();
-//         newTab.document.write(htmlContent);
-//         newTab.document.close();
-//     }
-//     window.open(`data:text/html,${missing_html}`, '_blank');
-//     window.open(`data:text/html,${surplus_html}`, '_blank');
-// }
-
-function saveAndOpenHtml(htmlName, htmlContent) {
-    let blob = new Blob([htmlContent], { type: "text/html" });
-    let blobUrl = URL.createObjectURL(blob);
-
-    chrome.downloads.download({
-        url: blobUrl,
-        filename: htmlName,
-        saveAs: false
-    }, () => {
-        setTimeout(() => { window.open(blobUrl, "_blank"); }, 500);
+    chrome.tabs.create({url:chrome.runtime.getURL("missing.html")});
+    chrome.tabs.create({url:chrome.runtime.getURL("surplus.html")});
+    
+    // back to idle state
+    currentState = 0;
+    chrome.runtime.sendMessage({
+        action: "popup_nomsg",
+        state: currentState
     });
 }
-

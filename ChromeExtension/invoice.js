@@ -21,7 +21,7 @@ class Invoice {
             if (index === 2) {
                 this.worksheetInfo = line.split(',');
             } else if (index >= 4) {
-                var record = line.split(',');
+                let record = line.split(',');
                 for (const idx of [RECORD_RECQTY, RECORD_SHPQTY]) {
                     if (record[idx] === ''){
                         record[idx] = -1;

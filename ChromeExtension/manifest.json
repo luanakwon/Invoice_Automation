@@ -30,5 +30,11 @@
             "catapultElements_test.js",
             "content.js"]
         }
+    ],
+    "web_accessible_resources": [
+    {
+        "resources": ["missing.html","surplus.html"],
+        "matches": ["<all_urls>"]
+    }
     ]
 }

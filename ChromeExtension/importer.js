@@ -10,9 +10,7 @@ const Importer = (()=>{
         chrome.runtime.onMessage.addListener(runtimeMessageListener);
         // load list from session storage
         await chrome.storage.session.get("organizedInvoices").then((result)=>{
-            organizedInvoiceList = new Array(
-                JSON.parse(result["organizedInvoices"])
-            )
+            organizedInvoiceList = JSON.parse(result["organizedInvoices"]);
         });
         // organizedInvoiceList = new Array(
         //     JSON.parse(
@@ -22,6 +20,7 @@ const Importer = (()=>{
         // start from 0
         curIdx = 0;
         curName = organizedInvoiceList[curIdx];
+        console.log(curName);
         await chrome.storage.session.get(curName).then((result)=>{
             curInvoice = JSON.parse(result[curName]);
         });
