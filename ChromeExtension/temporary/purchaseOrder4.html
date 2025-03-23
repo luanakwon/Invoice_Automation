@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+            Purchase Order
+        </title>
+    </head>
+
+    <script>
+        var invID = 4;
+    </script>
+
+    <body>
+        <h3>Purchase Order </h3>
+        <span id="actionbar">
+            <div>
+                <button id="save_btn">
+                    <span>S</span>AVE
+                </button>
+                <button id="export_btn">
+                    E<span>X</span>PORT
+                </button>
+                <button id="import_btn">
+                    IM<span>P</span>ORT
+                </button>
+            </div>
+        </span>
+
+        <div id="popup_panel">
+            format info: comma (popup panel)
+            <button id="popup_ok">OK</button>
+        </div>
+
+        <div id="import_fileinput">
+            <input type="file" id="actual_input">
+        </div>
+
+        <div id="mbox1" class="messageBox">
+            Overwrite details?
+            <button id="messageBox_btn_yes">Yes</button>
+            <button id="messageBox_btn_no">No</button>
+        </div>
+
+        <div class="popupContent">
+            Items not imported : 
+            <button id="popupContent_btn_yes">-export</button>
+            <button id="popupContent_btn_no">Close</button>
+        </div>
+
+        
+
+        <script>
+            const out_name = 'UNFITEST - INV# '+invID;
+            const content = `Purchase Order
+[WorkSheetInfo]
+UNFITEST - INV# ${invID},,,UNSO,,,,,,,,,,0,,,${invID},0.0000,0.0000,0.0000,0,,0.0000,,0.0000,0,01/21/2025,,1,1,0.000,1,0,Gateway has created this Receive Only Purchase Order Worksheet from Invoice Number 016163118003 received on 01/22/25.
+[Records]
+08400,Zevia Crmy Root Beer Soda 6pk,849429001799,0,CS,1.000,18.8900,18.8900,0,1,0,0,0,0.0000,18.89,,,,,,,,,,,,,,,,,,,,,0,1,4,0.000,1,18.8900,0.0000
+
+                `;
+            var importExportState = 'export';
+            //  on idle : export, import active. save, messagebox, popuppanel inactive.
+            //  export button click > show popup panel > 
+            //      popup ok button click > trigger download (samplePO.txt)
+            //  on <input type='file'> change > show popup panel > popup ok button click > 
+            //      show messagebox > close button click 
+            //      show popupContent > no button click > save button active
+
+            document.querySelector('h3').innerHTML += invID;
+
+            document.getElementById('export_btn').disabled = false;
+            document.getElementById('import_btn').disabled = false;
+            document.getElementById('save_btn').disabled = true;
+            document.getElementById('popup_panel').style.display = 'none';
+            document.querySelector('.popupContent').style.display = 'none';
+            document.getElementById('mbox1').style.display = 'none';
+
+            document.getElementById('export_btn').addEventListener("click", ()=>{
+                console.log('export button clicked');
+                importExportState = 'export';
+                document.getElementById('popup_panel').style.display = 'block';
+            });
+            document.getElementById('popup_ok').addEventListener("click", ()=>{
+                if (importExportState === 'export'){
+                    console.log("trigger download");
+                    const blob = new Blob([content], { type: "text/plain" });
+
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = out_name;  // Set download filename
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href); // Cleanup
+                } else if (importExportState === 'import') {
+                    console.log('import format confirmed');
+                    
+                    document.getElementById('export_btn').disabled = true;
+                    document.getElementById('mbox1').style.display = 'block';
+                }
+                
+                document.getElementById('popup_panel').style.display = 'none';
+            });
+            document.querySelector("#import_fileinput #actual_input").addEventListener('change', (arg)=>{
+                console.log('import fileinput change detected');
+                console.log(arg);
+                importExportState = 'import';
+                document.getElementById('popup_panel').style.display = 'block';
+            });
+            document.getElementById('messageBox_btn_no').addEventListener("click",()=>{
+                console.log('overwrite detail no clicked');
+                
+                document.querySelector('.popupContent').style.display = 'block';
+                document.getElementById('mbox1').style.display = 'none';
+            });
+            document.getElementById('popupContent_btn_no').addEventListener('click',()=>{
+                console.log("not imported items dismissed");
+                document.getElementById('save_btn').disabled = false;
+                document.querySelector('.popupContent').style.display = 'none';
+            });
+            document.getElementById('save_btn').addEventListener('click', ()=>{
+                console.log('save btn clicked');
+                
+                document.getElementById('export_btn').disabled = false;
+                document.getElementById('save_btn').disabled = true;
+            });
+
+        </script>
+    </body>
+</html>

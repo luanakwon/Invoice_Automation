@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title> WorksheetEditor </title>
+    </head>
+
+    <body>
+        <div>
+            <button id="navigate_btn_first">&lt;&lt;</button>
+            <button id="navigate_btn_next">&gt;</button>
+            <div id="table_1">
+                <table id="checkboxes_table">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="table_2">
+                <table id="checkboxes_table">
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div>
+                                    <input type="checkbox">
+                                </div>
+                            </td>
+                            <td>
+                                <a href=""></a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    <script>
+        const PO_HREF = "file:///C:/Users/junny/OneDrive/%EB%AC%B8%EC%84%9C/PythonProject/Invoice_Automation/temporary/purchaseOrder";
+        const firstBtn = document.getElementById("navigate_btn_first");
+        const nextBtn = document.getElementById("navigate_btn_next");
+
+        // function setTablePage(pageNum) {
+        //     const aElements = document.querySelectorAll('#table_${i} a');
+
+        //     for (let i=0;i<3;i++){
+        //         let a = aElements[i];
+        //         a.href = PO_HREF + nums[i] + ".html";
+        //         a.innerHTML = `purchase order ${nums[i]}`;
+        //     }
+        // }
+
+        function start() {
+            const aElements = document.querySelectorAll('a');
+            for (let i=0;i<6;i++){
+                let a = aElements[i];
+                a.href = PO_HREF + (i+1) + ".html";
+                a.innerHTML = `UNFITEST - INV# ${i+1}`;
+            }
+            document.getElementById('table_1').style.display = 'block';
+            document.getElementById('table_2').style.display = 'none';
+            firstBtn.disabled = true;
+            nextBtn.disabled = false;
+        }
+
+        firstBtn.addEventListener("click",()=>{
+            document.getElementById('table_1').style.display = 'block';
+            document.getElementById('table_2').style.display = 'none';
+            firstBtn.disabled = true;
+            nextBtn.disabled = false;
+        });
+
+        nextBtn.addEventListener("click",()=>{
+            document.getElementById('table_1').style.display = 'none';
+            document.getElementById('table_2').style.display = 'block';
+            firstBtn.disabled = false;
+            nextBtn.disabled = true;
+        })
+
+        start();
+    </script>
+</html>
