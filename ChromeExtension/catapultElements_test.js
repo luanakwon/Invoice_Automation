@@ -1,4 +1,4 @@
-const ROOT = "file:///C:/Users/junny/OneDrive/%EB%AC%B8%EC%84%9C/PythonProject/Invoice_Automation/temporary";
+const ROOT = "file:///C:/PATH_TO_FOLDER/temporary";
 
 const CATAPULT_WORKSHEET_URL = `${ROOT}/WorksheetEditor`;
 const CATAPULT_PO_URL_COMMON = `${ROOT}/purchaseOrder`;

@@ -1,7 +1,4 @@
 
-
-// importScripts("catapultElements_test.js");
-
 console.log("content.js loaded");
 
 // send current url everytime content.js is loaded

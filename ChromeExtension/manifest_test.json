@@ -4,7 +4,6 @@
     "version": "1.0",
     "description": "Automates invoice(Purchase Order) processing in Catapult Web Office",
     "permissions": [
-        "file://*/*",
         "activeTab",
         "storage",
         "scripting",
@@ -12,7 +11,7 @@
         "tabs"
     ],
     "host_permissions": [
-        "file:///C:/Users/junny*"
+        "file:///C:/Users/*"
     ],
     "background": {
         "service_worker": "background.js"
@@ -25,16 +24,16 @@
     },
     "content_scripts": [
         {
-        "matches": ["file:///C:/Users/junny*"],
+        "matches": ["file:///C:/Users/*"],
         "js": [
             "catapultElements_test.js",
             "content.js"]
         }
     ],
     "web_accessible_resources": [
-    {
-        "resources": ["missing.html","surplus.html"],
-        "matches": ["<all_urls>"]
-    }
+        {
+            "resources": ["missing.html","surplus.html"],
+            "matches": ["<all_urls>"]
+        }
     ]
 }
