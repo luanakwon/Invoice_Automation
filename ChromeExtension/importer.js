@@ -18,17 +18,8 @@ const Importer = (()=>{
         //     )
         // );
         // start from 0
-        curIdx = 0;
-        curName = organizedInvoiceList[curIdx];
-        console.log(curName);
-        await chrome.storage.session.get(curName).then((result)=>{
-            curInvoice = JSON.parse(result[curName]);
-        });
-        // curInvoice = JSON.parse(
-        //     window.sessionStorage.getItem(curName)
-        // );
-        // start by navigating tab
-        chrome.tabs.update({url: curInvoice.link});
+        curIdx = -1;
+        importNext();
     }
 
     function importNext(){

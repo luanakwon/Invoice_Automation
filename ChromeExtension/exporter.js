@@ -21,19 +21,8 @@ const Exporter = (()=>{
         //     )
         // );
         // start from 0
-        curIdx = 0;
-        curName = selectedInvoiceList[curIdx];
-        console.log(selectedInvoiceList);
-        console.log(curName);
-        await chrome.storage.session.get(curName).then((result)=>{
-            console.log(result[curName]);
-            curInvoice = JSON.parse(result[curName]);
-        });
-        // curInvoice = JSON.parse(
-        //     window.sessionStorage.getItem(curName)
-        // );
-        // start by navigating tab
-        chrome.tabs.update({url: curInvoice.link});
+        curIdx = -1;
+        exportNext();
     }
     
     function exportNext(){
