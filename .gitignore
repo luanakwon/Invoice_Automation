@@ -4,6 +4,9 @@ invoices*/
 invoice_log.txt
 missing.txt
 surplus.txt
+InvAuto.log
+missing.html
+surplus.html
 
 __pycache__/
 .venv/
@@ -17,8 +20,10 @@ dist/
 # WebOffice Details
 catapult_elements.py
 ChromeExtension/catapultElements.js
+ChromeExtension/manifest_cp.json
 ChromeExtension/manifest.json
 
 # temporary files
 tmp.py
 tmp.html
+/temporary
