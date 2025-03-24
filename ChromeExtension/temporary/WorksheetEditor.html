@@ -83,19 +83,9 @@
         </div>
     </body>
     <script>
-        const PO_HREF = "file:///C:/Users/junny/OneDrive/%EB%AC%B8%EC%84%9C/PythonProject/Invoice_Automation/temporary/purchaseOrder";
+        const PO_HREF = "./purchaseOrder";
         const firstBtn = document.getElementById("navigate_btn_first");
         const nextBtn = document.getElementById("navigate_btn_next");
-
-        // function setTablePage(pageNum) {
-        //     const aElements = document.querySelectorAll('#table_${i} a');
-
-        //     for (let i=0;i<3;i++){
-        //         let a = aElements[i];
-        //         a.href = PO_HREF + nums[i] + ".html";
-        //         a.innerHTML = `purchase order ${nums[i]}`;
-        //     }
-        // }
 
         function start() {
             const aElements = document.querySelectorAll('a');
@@ -125,5 +115,6 @@
         })
 
         start();
+        
     </script>
 </html>
