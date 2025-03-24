@@ -206,8 +206,8 @@ async function loadAndOrganizeExportedResult(){
         }, (response) => {
             if (
                 !response ||
-                chrome.runtime.lastError.message.startsWith(
-                    "Could not establish connection")
+                (chrome.runtime.lastError && chrome.runtime.lastError.message.startsWith(
+                    "Could not establish connection"))
             ){
                 console.log("no connection");
                 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

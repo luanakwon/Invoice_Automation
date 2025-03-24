@@ -18,18 +18,26 @@ class Invoice {
         
         const lines = txt_content.split('\n');
         lines.forEach((line, index) => {
+            if (!line.includes(',')){
+                console.log(line);
+                console.log(index);
+                console.log(line.split(','));
+            }
             if (index === 2) {
                 this.worksheetInfo = line.split(',');
             } else if (index >= 4) {
                 let record = line.split(',');
-                for (const idx of [RECORD_RECQTY, RECORD_SHPQTY]) {
-                    if (record[idx] === ''){
-                        record[idx] = -1;
-                    } else {
-                        record[idx] = parseFloat(record[idx]);
+                if (record && record.length >= RECORD_VFFLAG) {
+                    for (const idx of [RECORD_RECQTY, RECORD_SHPQTY]) {
+                        if (record[idx] === ''){
+                            record[idx] = -1;
+                        } else {
+                            record[idx] = parseFloat(record[idx]);
+                        }
                     }
+                    console.log(record);
+                    this.records.push(record);
                 }
-                this.records.push(record);
             }
         });
 
@@ -43,6 +51,9 @@ class Invoice {
 
     // format to txt method
     toTxt() {
+        try{
+            console.log(this.records);
+
         var records_txt = '';
         this.records.forEach((record) => {
             if (record !== null) {
@@ -58,9 +69,18 @@ class Invoice {
                         record_cp[idx] = record_cp[idx].toFixed(3);
                     }
                 }
-            }
-            records_txt += record.join(',');
+                console.log(record_cp);
+                records_txt += '\n' + record_cp.join(',');
+            }    
         });
+
+        } catch (err) {
+            console.log(err);
+            
+            
+            console.log(records_txt);
+            noSuchFunction();
+        }
 
         // if no records, return empty string
         if (records_txt === '') {
@@ -69,8 +89,8 @@ class Invoice {
 
         // add worksheet info
         var txt = 'Purchase Order \n[WorkSheetInfo]\n';
-        txt += this.worksheetInfo.join(',');
-        txt += '[Records]\n';
+        txt += this.worksheetInfo.join(',') + '\n';
+        txt += '[Records]';
 
         return txt + records_txt;
     }

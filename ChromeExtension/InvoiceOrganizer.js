@@ -44,7 +44,7 @@ const InvoiceOrganizer = (()=>{
                     }
                     surplusItems.get(suID)['surplus'] += receivedQty;
                     // modify the record
-                    invoice.records[i][RECORD_SHPQTY] = 0;
+                    invoice.records[i][RECORD_RECQTY] = 0;
                     // log
                     console.log(`Found surplus item ${suID}/${receivedQty}(not ordered) from ${invoiceID}`);
                 }
