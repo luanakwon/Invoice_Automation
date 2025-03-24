@@ -1,7 +1,7 @@
-const ROOT = "file:///C:/PATH_TO_FOLDER/temporary";
+const ROOT = "file:///PATH/temporary";
 
 const CATAPULT_WORKSHEET_URL = `${ROOT}/WorksheetEditor`;
-const CATAPULT_PO_URL_COMMON = `${ROOT}/purchaseOrder`;
+const CATAPULT_PO_URL_COMMON = `./purchaseOrder`;
 const NAVIGATE_BTN_FIRST = {Id:"navigate_btn_first"};
 const NAVIGATE_BTN_NEXT = {Id:"navigate_btn_next"};
 
